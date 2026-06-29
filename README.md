@@ -4,6 +4,30 @@ Escape The Cloud is a Windows desktop app built with Electron that helps users c
 
 The app is designed for users who want to clean up cloud copies of files that already exist locally.
 
+## Features
+
+- Compare files in a local folder against Google Drive using file hashes
+- Sign in with Google OAuth 2.0 using a user-provided Desktop App credential file
+- Keep `credentials.json` in Downloads or any other folder instead of copying it into the app
+- Review matches before deleting cloud files
+- Install through a Windows installer with selectable install location
+
+## For End Users
+
+If you just want to use the app and do not care about the technical details, this is the short version:
+
+1. Install the app using the Windows setup file.
+2. Create a Google OAuth Desktop App credential in Google Cloud and download `credentials.json`.
+3. Open the app and click `Pick credentials.json`.
+4. Choose the downloaded file from Downloads or any folder you saved it in.
+5. Click `Google Drive`.
+6. Pick the local folder that already contains your files.
+7. Sign in to Google in your browser.
+8. If the app finds matching files in Google Drive, review the prompt and confirm deletion only if you want the cloud copies removed.
+
+In plain English: the app helps you remove Google Drive duplicates when you already have the same files saved locally.
+
+
 ## What It Does
 
 - Lets the user pick a local folder
@@ -137,6 +161,14 @@ npm run build:win
 - Do not distribute personal `credentials.json` files.
 - Do not commit local credentials or tokens to source control.
 - The repository ignores `credentials.json`, `userData/`, `dist/`, and `node_modules/`.
+
+## Known Issues
+
+- Google-native files such as Docs, Sheets, and Slides are not part of the hash-based duplicate matching flow.
+- Some Google Drive items do not expose an MD5 checksum, so they are skipped.
+- If Google returns `invalid_grant`, the usual fix is to clear the cached token and sign in again with a valid Desktop App OAuth client.
+- Unsigned Windows installers may show a SmartScreen warning on first run.
+- Windows packaging is configured; other platforms are not currently packaged.
 
 ## Limitations
 
