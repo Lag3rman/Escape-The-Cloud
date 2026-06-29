@@ -1,0 +1,6 @@
+node_modules/
+dist/
+userData/
+credentials.json
+*.log
+.DS_Store

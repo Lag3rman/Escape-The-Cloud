@@ -1,0 +1,48 @@
+{
+  "name": "escape-from-google-drive",
+  "version": "1.0.0",
+  "description": "Escape from Google Drive",
+  "productName": "Escape from Google Drive",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dist": "electron-builder",
+    "build:win": "electron-builder --win nsis"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^40.6.1",
+    "electron-builder": "^26.8.1"
+  },
+  "dependencies": {
+    "googleapis": "^171.4.0"
+  },
+  "overrides": {
+    "tar": "^7.5.10"
+  },
+  "build": {
+    "appId": "com.escape.fromgoogledrive",
+    "productName": "Escape from Google Drive",
+    "asar": true,
+    "files": [
+      "**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Escape from Google Drive"
+    },
+    "publish": null
+  }
+}

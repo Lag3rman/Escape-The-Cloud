@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Escape from Google Drive</title>
+</head>
+<body>
+  <h1>Escape from Google Drive</h1>
+  <p>Compare a local folder with your Google Drive and clean up duplicates.</p>
+  <button id="google-drive-btn">Google Drive</button>
+  <div id="status" style="margin-top: 12px;"></div>
+
+  <hr style="margin:16px 0;">
+  <h2>Setup</h2>
+  <div style="margin-bottom:8px;">
+    <strong>Google Drive</strong>
+    <div style="margin-top:6px;">
+      <button id="pick-google-creds">Pick credentials.json</button>
+      <span id="google-creds-path" style="margin-left:8px;"></span>
+    </div>
+    <div style="margin-top:6px;font-size:12px;">
+      Create a Google Cloud project → Enable Drive API → Create OAuth 2.0 Desktop app → Download credentials.json → Import it here.
+    </div>
+    <div style="margin-top:6px;">
+      <a href="https://console.cloud.google.com/" class="external-link">Open Google Cloud Console</a>
+    </div>
+  </div>
+  <div style="margin-top:12px;font-size:12px;">
+    <span id="app-dir"></span>
+    <div id="google-token-path" style="margin-top:4px;"></div>
+  </div>
+  <div style="margin-top:16px;">
+    <details>
+      <summary><strong>Step-by-step: Google Drive credentials</strong></summary>
+      <ol style="margin-top:8px;">
+        <li>Open Google Cloud Console.</li>
+        <li>Create a new project or select an existing project.</li>
+        <li>Open “APIs & Services” → “Library” → enable “Google Drive API”.</li>
+        <li>Open “APIs & Services” → “Credentials”.</li>
+        <li>Click “Create Credentials” → “OAuth client ID”.</li>
+        <li>Application type: “Desktop app”.</li>
+        <li>Download the JSON (client secrets).</li>
+        <li>Back in this app, click “Pick credentials.json” and choose the downloaded file.</li>
+        <li>Click “Google Drive” above to start sign-in and comparison.</li>
+      </ol>
+    </details>
+    <details style="margin-top:8px;">
+      <summary><strong>Cleanup and disable access</strong></summary>
+      <div style="margin-top:8px;">
+        Use these actions to remove local credentials and revoke/disable access in your Google account and project.
+      </div>
+      <div style="margin-top:8px;">
+        <button id="delete-google-creds">Delete credentials.json (local)</button>
+        <button id="clear-google-token">Clear cached token</button>
+      </div>
+      <ol style="margin-top:8px;">
+        <li>Delete local files: remove credentials.json and the cached token using the buttons above.</li>
+        <li>Revoke account access: open <a href="https://myaccount.google.com/permissions" class="external-link">Google Account → Third‑party access</a> and remove “Escape from Google Drive”.</li>
+        <li>Disable the API: open <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" class="external-link">Drive API</a> in your project and click “Disable”.</li>
+        <li>Delete the OAuth client: open <a href="https://console.cloud.google.com/apis/credentials" class="external-link">APIs & Services → Credentials</a> and delete the Desktop OAuth client you created.</li>
+        <li>Optional: if this project is only for this app, you can delete the Google Cloud project to remove all credentials and APIs.</li>
+      </ol>
+    </details>
+  </div>
+
+  <div style="margin-top:16px;border:1px solid #ccc;padding:12px;border-radius:6px;">
+    <h3 style="margin-top:0;">Guided Setup (recommended)</h3>
+    <div id="guide" data-step="0">
+      <div id="guide-content" style="min-height:80px;"></div>
+      <div style="margin-top:12px;">
+        <button id="guide-prev">Back</button>
+        <button id="guide-next">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const gdBtn = document.getElementById('google-drive-btn');
+    let ipcRenderer = null;
+    let electronShell = null;
+    try {
+      const electron = window.require ? window.require('electron') : null;
+      ipcRenderer = electron ? electron.ipcRenderer : null;
+      electronShell = electron ? electron.shell : null;
+    } catch (e) {
+      ipcRenderer = null;
+    }
+
+    function setStatus(text) {
+      if (statusEl) {
+        statusEl.textContent = text;
+      }
+    }
+
+    if (gdBtn) {
+      gdBtn.addEventListener('click', async () => {
+        setStatus('Google Drive: starting...');
+        if (!ipcRenderer) {
+          setStatus('Google Drive: renderer IPC unavailable');
+          return;
+        }
+        const res = await ipcRenderer.invoke('start-google-flow').catch(err => ({ ok: false, error: String(err) }));
+        if (res && res.ok) {
+          setStatus(`Google Drive: found ${res.found || 0}, deleted ${res.deleted || 0}`);
+        } else if (res && res.canceled) {
+          setStatus('Google Drive: canceled');
+        } else {
+          setStatus(`Google Drive error: ${res && res.error ? res.error : 'unknown'}`);
+        }
+      });
+    }
+
+    
+    const extLinks = document.querySelectorAll('a.external-link');
+    extLinks.forEach(a => {
+      a.addEventListener('click', (e) => {
+        if (electronShell) {
+          e.preventDefault();
+          electronShell.openExternal(a.href);
+        } else {
+          a.target = '_blank';
+        }
+      });
+    });
+
+    const appDirEl = document.getElementById('app-dir');
+    const googlePathEl = document.getElementById('google-creds-path');
+    const googleTokenPathEl = document.getElementById('google-token-path');
+    const pickGoogleBtn = document.getElementById('pick-google-creds');
+    const deleteCredsBtn = document.getElementById('delete-google-creds');
+    const clearTokenBtn = document.getElementById('clear-google-token');
+
+    async function loadPaths() {
+      if (!ipcRenderer) return;
+      const p = await ipcRenderer.invoke('get-paths').catch(() => null);
+      if (p && appDirEl) {
+        appDirEl.textContent = `App folder: ${p.appDir}`;
+      }
+      if (p && googlePathEl) {
+        googlePathEl.textContent = `Expected Google credentials: ${p.googleCreds}`;
+      }
+      if (p && googleTokenPathEl && p.googleToken) {
+        googleTokenPathEl.textContent = `Cached token path: ${p.googleToken}`;
+      }
+    }
+    loadPaths();
+
+    async function getSetupStatus() {
+      if (!ipcRenderer) return { ok: true, googleCredsExists: false };
+      const s = await ipcRenderer.invoke('check-setup-status').catch(() => null);
+      return s || { ok: true, googleCredsExists: false };
+    }
+
+    // Simple guided setup wizard
+    const guide = document.getElementById('guide');
+    const guideContent = document.getElementById('guide-content');
+    const guidePrev = document.getElementById('guide-prev');
+    const guideNext = document.getElementById('guide-next');
+    let providerChoice = 'google';
+
+    function renderStep(step, status) {
+      if (!guideContent) return;
+      if (step === 0) {
+        guideContent.innerHTML = `
+          <div>
+            <div><strong>Provider</strong></div>
+            <div style="margin-top:8px;">Google Drive</div>
+          </div>`;
+      } else if (step === 1) {
+        const has = status.googleCredsExists ? '✅ Detected credentials.json' : '❌ Not detected';
+        guideContent.innerHTML = `
+          <div><strong>Google: Create and import credentials</strong></div>
+          <div style="margin-top:8px;">1) Open Google Cloud Console and enable Drive API.</div>
+          <div style="margin-top:4px;">2) Create OAuth client (Desktop app) and download credentials.json.</div>
+          <div style="margin-top:4px;">3) Click “Pick credentials.json” in Setup above to import.</div>
+          <div style="margin-top:8px;">Status: ${has}</div>
+          <div style="margin-top:8px;"><a href="https://console.cloud.google.com/" class="external-link">Open Google Cloud Console</a></div>`;
+      } else if (step === 2) {
+        guideContent.innerHTML = `
+          <div><strong>Sign in and run comparison</strong></div>
+          <div style="margin-top:8px;">Click “Google Drive” at the top, choose your local folder, sign in via browser, and review matches before deletion.</div>`;
+      }
+    }
+
+    async function refreshGuide() {
+      const step = parseInt(guide.getAttribute('data-step') || '0', 10);
+      const status = await getSetupStatus();
+      renderStep(step, status);
+      guidePrev.disabled = step === 0;
+      guideNext.textContent = step < 2 ? 'Next' : 'Done';
+    }
+
+    if (guide) {
+      guidePrev.addEventListener('click', () => {
+        const step = parseInt(guide.getAttribute('data-step') || '0', 10);
+        const next = Math.max(0, step - 1);
+        guide.setAttribute('data-step', String(next));
+        refreshGuide();
+      });
+      guideNext.addEventListener('click', () => {
+        const step = parseInt(guide.getAttribute('data-step') || '0', 10);
+        const next = Math.min(2, step + 1);
+        guide.setAttribute('data-step', String(next));
+        refreshGuide();
+      });
+      document.addEventListener('change', (e) => {
+        const t = e.target;
+        if (t && t.name === 'prov') {}
+      });
+      refreshGuide();
+    }
+
+    if (pickGoogleBtn && ipcRenderer) {
+      pickGoogleBtn.addEventListener('click', async () => {
+        setStatus('Importing Google credentials...');
+        const res = await ipcRenderer.invoke('pick-google-credentials').catch(err => ({ ok: false, error: String(err) }));
+        if (res && res.ok) {
+          setStatus('Google credentials imported');
+          loadPaths();
+        } else if (res && res.canceled) {
+          setStatus('Canceled');
+        } else {
+          setStatus(`Import error: ${res && res.error ? res.error : 'unknown'}`);
+        }
+      });
+    }
+    if (deleteCredsBtn && ipcRenderer) {
+      deleteCredsBtn.addEventListener('click', async () => {
+        setStatus('Deleting local credentials.json...');
+        const res = await ipcRenderer.invoke('delete-google-credentials').catch(err => ({ ok: false, error: String(err) }));
+        if (res && res.ok) {
+          setStatus(res.deleted ? 'Deleted credentials.json' : 'No credentials.json found');
+          loadPaths();
+        } else {
+          setStatus(`Delete error: ${res && res.error ? res.error : 'unknown'}`);
+        }
+      });
+    }
+    if (clearTokenBtn && ipcRenderer) {
+      clearTokenBtn.addEventListener('click', async () => {
+        setStatus('Clearing cached token...');
+        const res = await ipcRenderer.invoke('clear-google-token').catch(err => ({ ok: false, error: String(err) }));
+        if (res && res.ok) {
+          setStatus(res.cleared ? 'Cleared cached token' : 'No cached token found');
+          loadPaths();
+        } else {
+          setStatus(`Clear error: ${res && res.error ? res.error : 'unknown'}`);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
